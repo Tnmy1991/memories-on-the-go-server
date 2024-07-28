@@ -1,10 +1,11 @@
 {
   "name": "memories-on-the-go-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "bin": {
     "memories-on-the-go-server": "bin/memories-on-the-go-server.js"
   },
   "scripts": {
+    "postinstall": "(cd lambdas && npm install);",
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
