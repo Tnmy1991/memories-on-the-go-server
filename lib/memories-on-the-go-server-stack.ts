@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -8,6 +9,11 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Create S3 bucket
+    const imageBucket = new s3.Bucket(this, "ImageBucket", {
+      bucketName: "memories-on-the-go-image-bucket",
+    });
+
     // User Table
     const userTable = new dynamodb.Table(this, "users", {
       partitionKey: {
@@ -16,19 +22,6 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
       sortKey: {
         name: "username",
-        type: dynamodb.AttributeType.STRING,
-      },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    // Access Token Table
-    const accessTokenTable = new dynamodb.Table(this, "access_token", {
-      partitionKey: {
-        name: "token_id",
-        type: dynamodb.AttributeType.STRING,
-      },
-      sortKey: {
-        name: "user_id",
         type: dynamodb.AttributeType.STRING,
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -55,7 +48,6 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       environment: {
         DEFAULT_TOKEN_EXPIRY: "7200",
         USER_TABLE_NAME: userTable.tableName,
-        ACCESSTOKEN_TABLE_NAME: accessTokenTable.tableName,
       },
     });
 
@@ -65,7 +57,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       handler: "images.handler",
       environment: {
         IMAGE_TABLE_NAME: imageTable.tableName,
-        ACCESSTOKEN_TABLE_NAME: accessTokenTable.tableName,
+        IMAGE_BUCKET_NAME: imageBucket.bucketName,
       },
     });
 
@@ -94,20 +86,15 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
 
     const usersApiResources = usersApi.root.addResource("users");
     usersApiResources.addResource("login").addMethod("POST");
-    usersApiResources.addResource("{user_id}").addMethod("PUT");
-    usersApiResources.addResource("check-username").addMethod("GET");
-    usersApiResources.addResource("refresh-token").addMethod("POST");
     usersApiResources.addResource("create-account").addMethod("POST");
 
     const imagesApiResources = imagesApi.root.addResource("images");
-    imagesApiResources.addResource("fetch").addMethod("GET");
+    imagesApiResources.addResource("listing").addMethod("GET");
     imagesApiResources.addResource("upload").addMethod("POST");
-    imagesApiResources.addResource("{image_id}").addMethod("DELETE");
 
+    // Grant permissions to Lambda function
+    imageBucket.grantReadWrite(images);
     userTable.grantReadWriteData(users);
-    accessTokenTable.grantReadWriteData(users);
-
     imageTable.grantReadWriteData(images);
-    accessTokenTable.grantReadData(images);
   }
 }
