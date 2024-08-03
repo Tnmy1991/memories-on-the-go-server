@@ -83,7 +83,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
       handler: images,
       proxy: false,
-      binaryMediaTypes: ["image/jpg", "image/png", "image/gif", "image/jpeg"],
+      binaryMediaTypes: ["multipart/form-data"],
     });
 
     const usersApiResources = usersApi.root.addResource("users");

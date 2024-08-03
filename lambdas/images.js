@@ -1,32 +1,12 @@
-import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { parse } from "lambda-multipart-parser";
 import { s3Client } from "./clients/s3Client.js";
 import { dbClient } from "./clients/dbClient.js";
+import { verifyUserIdentity } from "./helpers/helpers.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { ScanCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-
-const verifyUserIdentity = (headers) => {
-  try {
-    const token = headers.Authorization.replace("Bearer ", "");
-    const decoded = jwt.verify(
-      token,
-      "=7@b&cibgc65x8jyyi1!q7-1w6&-2qegp)tf!7x270+h+92lrnyour"
-    );
-
-    return decoded;
-  } catch (err) {
-    console.error(err);
-    return {
-      statusCode: 401,
-      body: JSON.stringify({
-        message: "Access token either malformed or invalid",
-      }),
-    };
-  }
-};
 
 export const handler = async function (event) {
   const routePath = event.path.replace("/images/", "");
@@ -47,20 +27,19 @@ export const handler = async function (event) {
 
           try {
             await s3Client.send(new PutObjectCommand(params)).then(async () => {
-              await dbClient.send(
-                new PutItemCommand({
-                  TableName: process.env.IMAGE_TABLE_NAME,
-                  Item: marshall({
-                    image_id: uuidv4(),
-                    user_id: userIdentity.user_id,
-                    filename: image.filename,
-                    content_type: image.contentType,
-                    s3_key: s3Key,
-                    cretaed_at: new Date().toISOString(),
-                    updated_at: "",
-                  }),
-                })
-              );
+              const imageParam = {
+                TableName: process.env.IMAGE_TABLE_NAME,
+                Item: marshall({
+                  image_id: uuidv4(),
+                  user_id: userIdentity.user_id,
+                  filename: image.filename,
+                  content_type: image.contentType,
+                  s3_key: s3Key,
+                  created_at: new Date().toISOString(),
+                  updated_at: "",
+                }),
+              };
+              await dbClient.send(new PutItemCommand(imageParam));
             });
           } catch (error) {
             console.error(`Error uploading image ${image.filename}:`, error);

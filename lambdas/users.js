@@ -1,69 +1,26 @@
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import {
+  isPhoneExist,
+  passwordHash,
+  authorizeUser,
+  isUsernameExist,
+  comparePassword,
+} from "./helpers/helpers.js";
 import { v4 as uuidv4 } from "uuid";
 import { dbClient } from "./clients/dbClient.js";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { ScanCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 
-const generateSalt = () => bcrypt.genSaltSync(9);
-
-const isUsernameExist = async (username) => {
-  const command = new ScanCommand({
-    TableName: process.env.USER_TABLE_NAME,
-    FilterExpression: "#UserName = :username",
-    ExpressionAttributeNames: {
-      "#UserName": "username",
-    },
-    ExpressionAttributeValues: {
-      ":username": { S: username },
-    },
-  });
-
-  const response = await dbClient.send(command);
-  return response?.Count > 0;
-};
-
-const isPhoneExist = async (phoneNumber) => {
-  const command = new ScanCommand({
-    TableName: process.env.USER_TABLE_NAME,
-    FilterExpression: "#PhoneNumber = :phoneNumber",
-    ExpressionAttributeNames: {
-      "#PhoneNumber": "phone_number",
-    },
-    ExpressionAttributeValues: {
-      ":phoneNumber": { S: phoneNumber },
-    },
-  });
-
-  const response = await dbClient.send(command);
-  return response?.Count > 0;
-};
-
-const passwordHash = (password) => {
-  const salt = generateSalt();
-  return bcrypt.hashSync(password, salt);
-};
-
-const authorizeUser = (name, user_id) => {
-  return jwt.sign(
-    { name: name, user_id: user_id },
-    "=7@b&cibgc65x8jyyi1!q7-1w6&-2qegp)tf!7x270+h+92lrnyour",
-    { expiresIn: "1h" }
-  );
-};
-
 export const handler = async function (event) {
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      body: "invalid request, you are missing the parameter body",
+    };
+  }
   const routePath = event.path.replace("/users/", "");
 
   switch (routePath) {
     case "create-account":
-      if (!event.body) {
-        return {
-          statusCode: 400,
-          body: "invalid request, you are missing the parameter body",
-        };
-      }
-
       try {
         const parseRequest = JSON.parse(event.body);
         const reponse = {
@@ -109,13 +66,6 @@ export const handler = async function (event) {
       }
 
     case "login":
-      if (!event.body) {
-        return {
-          statusCode: 400,
-          body: "invalid request, you are missing the parameter body",
-        };
-      }
-
       try {
         const parseRequest = JSON.parse(event.body);
         const reponse = {
@@ -136,7 +86,7 @@ export const handler = async function (event) {
 
         const { Items } = await dbClient.send(command);
         const user = unmarshall(Items[0]);
-        const isPasswordCorrect = bcrypt.compareSync(
+        const isPasswordCorrect = comparePassword(
           parseRequest.password,
           user.password
         );
