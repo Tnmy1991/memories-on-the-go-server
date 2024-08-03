@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { v4 as uuidv4 } from "uuid";
 import { dbClient } from "./clients/dbClient.js";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { ScanCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
@@ -43,10 +44,10 @@ const passwordHash = (password) => {
   return bcrypt.hashSync(password, salt);
 };
 
-const authorizeUser = (parseRequest) => {
+const authorizeUser = (name, user_id) => {
   return jwt.sign(
-    { name: parseRequest.name, user_id: parseRequest.user_id },
-    "=7@b&cibgc65x8jyyi1!q7-1w6&-2qegp)tf!7x270+h+92lrnyour-secret-key",
+    { name: name, user_id: user_id },
+    "=7@b&cibgc65x8jyyi1!q7-1w6&-2qegp)tf!7x270+h+92lrnyour",
     { expiresIn: "1h" }
   );
 };
@@ -85,16 +86,18 @@ export const handler = async function (event) {
           };
         }
 
+        const userId = uuidv4();
         const params = {
           TableName: process.env.USER_TABLE_NAME,
           Item: marshall({
             ...parseRequest,
             password: passwordHash(parseRequest.password),
+            user_id: userId,
           }),
         };
 
         await dbClient.send(new PutItemCommand(params)).then(() => {
-          reponse.access_token = authorizeUser(parseRequest);
+          reponse.access_token = authorizeUser(parseRequest.name, userId);
         });
         return {
           statusCode: 200,
@@ -139,7 +142,7 @@ export const handler = async function (event) {
         );
         if (isPasswordCorrect) {
           reponse.display_name = user.name;
-          reponse.access_token = authorizeUser(user);
+          reponse.access_token = authorizeUser(user.name, user.user_id);
           return {
             statusCode: 200,
             body: JSON.stringify(reponse),

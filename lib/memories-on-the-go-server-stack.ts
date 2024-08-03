@@ -34,7 +34,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       sortKey: {
-        name: "user_id",
+        name: "created_at",
         type: dynamodb.AttributeType.STRING,
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -46,7 +46,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       code: lambda.Code.fromAsset("lambdas"),
       handler: "users.handler",
       environment: {
-        DEFAULT_TOKEN_EXPIRY: "7200",
+        DEFAULT_TOKEN_EXPIRY: "1h",
         USER_TABLE_NAME: userTable.tableName,
       },
     });
@@ -56,6 +56,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       code: lambda.Code.fromAsset("lambdas"),
       handler: "images.handler",
       environment: {
+        BUCKET_SIGNED_URL_EXPIRY: "3600",
         IMAGE_TABLE_NAME: imageTable.tableName,
         IMAGE_BUCKET_NAME: imageBucket.bucketName,
       },
