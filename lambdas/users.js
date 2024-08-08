@@ -110,6 +110,30 @@ export const handler = async function (event) {
         return { statusCode: 500, body: errorResponse };
       }
 
+    case "lookup":
+      try {
+        let lookupFlag = false;
+        const parseRequest = JSON.parse(event.body);
+
+        switch (parseRequest.key) {
+          case "username":
+            lookupFlag = await isUsernameExist(parseRequest.value);
+            break;
+
+          case "phone_number":
+            lookupFlag = await isPhoneExist(parseRequest.value);
+            break;
+        }
+
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ lookupFlag }),
+        };
+      } catch (errorResponse) {
+        console.error(errorResponse);
+        return { statusCode: 500, body: errorResponse };
+      }
+
     default:
       return {
         statusCode: 404,

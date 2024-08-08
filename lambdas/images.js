@@ -31,13 +31,13 @@ export const handler = async function (event) {
                 user_id: userIdentity.user_id,
                 filename: image,
                 s3_key: s3Key,
+                s3_key_thumbnail: `thumbnails/${s3Key}`,
                 created_at: new Date().toISOString(),
-                updated_at: "",
               }),
             };
             await dbClient.send(new PutItemCommand(imageParam));
             const url = await getSignedUrl(s3Client, command, {
-              expiresIn: process.env.BUCKET_SIGNED_URL_EXPIRY,
+              expiresIn: process.env.PUT_SIGNED_URL_EXPIRY,
             });
 
             signedUrls.push({
@@ -82,18 +82,33 @@ export const handler = async function (event) {
         const { Items } = await dbClient.send(command);
         const fetchPromises = Items.map(async (item) => {
           const image = unmarshall(item);
-          const command = new GetObjectCommand({
-            Bucket: process.env.IMAGE_BUCKET_NAME,
-            Key: image.s3_key,
-          });
-
           try {
-            const url = await getSignedUrl(s3Client, command, {
-              expiresIn: process.env.BUCKET_SIGNED_URL_EXPIRY,
-            });
+            const original_image = await getSignedUrl(
+              s3Client,
+              new GetObjectCommand({
+                Bucket: process.env.IMAGE_BUCKET_NAME,
+                Key: image.s3_key,
+              }),
+              {
+                expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
+              }
+            );
+
+            const thumbnail_image = await getSignedUrl(
+              s3Client,
+              new GetObjectCommand({
+                Bucket: process.env.IMAGE_BUCKET_NAME,
+                Key: image.s3_key_thumbnail,
+              }),
+              {
+                expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
+              }
+            );
+
             imageListing.push({
               ...image,
-              url,
+              original_image,
+              thumbnail_image,
             });
           } catch (error) {
             console.error(`Error uploading image ${image.filename}:`, error);
