@@ -7,14 +7,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/s3-request-presigner": "^3.623.0",
     "@aws-sdk/client-dynamodb": "^3.137.0",
     "@aws-sdk/client-s3": "^3.620.0",
     "@aws-sdk/client-sns": "^3.609.0",
+    "@aws-sdk/s3-request-presigner": "^3.623.0",
     "@aws-sdk/util-dynamodb": "^3.137.0",
-    "lambda-multipart-parser": "^1.0.1",
-    "jsonwebtoken": "^9.0.2",
     "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "lambda-multipart-parser": "^1.0.1",
+    "mime": "^4.0.4",
+    "sharp": "^0.33.4",
+    "stream": "^0.0.3",
+    "util": "^0.12.5",
     "uuid": "^10.0.0"
   }
 }

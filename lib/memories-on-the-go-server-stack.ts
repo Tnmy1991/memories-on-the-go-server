@@ -1,9 +1,9 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 
 export class MemoriesOnTheGoServerStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
@@ -62,10 +62,17 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
     });
 
-    // Grant the Lambda function only the necessary SNS actions
-    const lambdaRole = images.role;
-    lambdaRole?.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSNSFullAccess")
+    const thumbnail = new lambda.Function(this, "ThumbnailHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      code: lambda.Code.fromAsset("lambdas"),
+      handler: "thumbnail.handler",
+    });
+
+    // Create an S3 event source and add it to the Lambda function
+    thumbnail.addEventSource(
+      new lambdaEventSources.S3EventSource(imageBucket, {
+        events: [s3.EventType.OBJECT_CREATED_PUT],
+      })
     );
 
     // defines as AWS APIGateway resource
@@ -83,7 +90,6 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
       handler: images,
       proxy: false,
-      binaryMediaTypes: ["multipart/form-data"],
     });
 
     const usersApiResources = usersApi.root.addResource("users");
@@ -96,6 +102,8 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
 
     // Grant permissions to Lambda function
     imageBucket.grantReadWrite(images);
+    imageBucket.grantReadWrite(thumbnail);
+
     userTable.grantReadWriteData(users);
     imageTable.grantReadWriteData(images);
   }

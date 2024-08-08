@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from "uuid";
-import { parse } from "lambda-multipart-parser";
 import { s3Client } from "./clients/s3Client.js";
 import { dbClient } from "./clients/dbClient.js";
 import { verifyUserIdentity } from "./helpers/helpers.js";
@@ -15,41 +14,48 @@ export const handler = async function (event) {
   switch (routePath) {
     case "upload":
       try {
-        const payload = await parse(event);
-        const uploadPromises = payload.files.map(async (image) => {
-          const s3Key = `${uuidv4()}-${image.filename}`;
-          const params = {
-            Bucket: process.env.IMAGE_BUCKET_NAME,
+        let signedUrls = [];
+        const payload = JSON.parse(event.body);
+        const uploadPromises = payload.images.map(async (image) => {
+          const s3Key = `${uuidv4()}-${image}`;
+          const command = new PutObjectCommand({
             Key: s3Key,
-            Body: image.content,
-            ContentType: image.contentType,
-          };
+            Bucket: process.env.IMAGE_BUCKET_NAME,
+          });
 
           try {
-            await s3Client.send(new PutObjectCommand(params)).then(async () => {
-              const imageParam = {
-                TableName: process.env.IMAGE_TABLE_NAME,
-                Item: marshall({
-                  image_id: uuidv4(),
-                  user_id: userIdentity.user_id,
-                  filename: image.filename,
-                  content_type: image.contentType,
-                  s3_key: s3Key,
-                  created_at: new Date().toISOString(),
-                  updated_at: "",
-                }),
-              };
-              await dbClient.send(new PutItemCommand(imageParam));
+            const imageParam = {
+              TableName: process.env.IMAGE_TABLE_NAME,
+              Item: marshall({
+                image_id: uuidv4(),
+                user_id: userIdentity.user_id,
+                filename: image,
+                s3_key: s3Key,
+                created_at: new Date().toISOString(),
+                updated_at: "",
+              }),
+            };
+            await dbClient.send(new PutItemCommand(imageParam));
+            const url = await getSignedUrl(s3Client, command, {
+              expiresIn: process.env.BUCKET_SIGNED_URL_EXPIRY,
+            });
+
+            signedUrls.push({
+              filename: image,
+              upload_url: url,
             });
           } catch (error) {
-            console.error(`Error uploading image ${image.filename}:`, error);
+            console.error(
+              `Error creating signedUrl for image ${image}:`,
+              error
+            );
           }
         });
 
         await Promise.all(uploadPromises);
         return {
           statusCode: 200,
-          body: JSON.stringify({ message: "Images uploaded successfully" }),
+          body: JSON.stringify(signedUrls),
         };
       } catch (error) {
         console.error("Error uploading images:", error);
@@ -79,7 +85,6 @@ export const handler = async function (event) {
           const command = new GetObjectCommand({
             Bucket: process.env.IMAGE_BUCKET_NAME,
             Key: image.s3_key,
-            ResponseContentType: image.content_type,
           });
 
           try {
