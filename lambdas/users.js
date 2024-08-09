@@ -4,6 +4,7 @@ import {
   authorizeUser,
   isUsernameExist,
   comparePassword,
+  responseSanitizer,
 } from "./helpers/helpers.js";
 import { v4 as uuidv4 } from "uuid";
 import { dbClient } from "./clients/dbClient.js";
@@ -12,10 +13,10 @@ import { ScanCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 
 export const handler = async function (event) {
   if (!event.body) {
-    return {
+    return responseSanitizer({
       statusCode: 400,
       body: "invalid request, you are missing the parameter body",
-    };
+    });
   }
   const routePath = event.path.replace("/users/", "");
 
@@ -30,17 +31,17 @@ export const handler = async function (event) {
         };
 
         if (await isUsernameExist(parseRequest.username)) {
-          return {
+          return responseSanitizer({
             statusCode: 400,
             body: "Username already taken.",
-          };
+          });
         }
 
         if (await isPhoneExist(parseRequest.phone_number)) {
-          return {
+          return responseSanitizer({
             statusCode: 400,
             body: "Phone Number already exist.",
-          };
+          });
         }
 
         const userId = uuidv4();
@@ -56,13 +57,17 @@ export const handler = async function (event) {
         await dbClient.send(new PutItemCommand(params)).then(() => {
           reponse.access_token = authorizeUser(parseRequest.name, userId);
         });
-        return {
+        return responseSanitizer({
           statusCode: 200,
           body: JSON.stringify(reponse),
-        };
+        });
       } catch (errorResponse) {
         console.error(errorResponse);
-        return { statusCode: 500, body: errorResponse };
+        return responseSanitizer({
+          statusCode: 500,
+          ...metaData,
+          body: errorResponse,
+        });
       }
 
     case "login":
@@ -93,21 +98,21 @@ export const handler = async function (event) {
         if (isPasswordCorrect) {
           reponse.display_name = user.name;
           reponse.access_token = authorizeUser(user.name, user.user_id);
-          return {
+          return responseSanitizer({
             statusCode: 200,
             body: JSON.stringify(reponse),
-          };
+          });
         } else {
-          return {
+          return responseSanitizer({
             statusCode: 400,
             body: JSON.stringify({
               message: `Password verification failed.`,
             }),
-          };
+          });
         }
       } catch (errorResponse) {
         console.error(errorResponse);
-        return { statusCode: 500, body: errorResponse };
+        return responseSanitizer({ statusCode: 500, body: errorResponse });
       }
 
     case "lookup":
@@ -125,21 +130,21 @@ export const handler = async function (event) {
             break;
         }
 
-        return {
+        return responseSanitizer({
           statusCode: 200,
           body: JSON.stringify({ lookupFlag }),
-        };
+        });
       } catch (errorResponse) {
         console.error(errorResponse);
-        return { statusCode: 500, body: errorResponse };
+        return responseSanitizer({ statusCode: 500, body: errorResponse });
       }
 
     default:
-      return {
+      return responseSanitizer({
         statusCode: 404,
         body: JSON.stringify({
           message: `Requested service endpoint not found.`,
         }),
-      };
+      });
   }
 };

@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 import { s3Client } from "./clients/s3Client.js";
 import { dbClient } from "./clients/dbClient.js";
-import { verifyUserIdentity } from "./helpers/helpers.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { ScanCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { responseSanitizer, verifyUserIdentity } from "./helpers/helpers.js";
 
 export const handler = async function (event) {
   const routePath = event.path.replace("/images/", "");
@@ -53,16 +53,16 @@ export const handler = async function (event) {
         });
 
         await Promise.all(uploadPromises);
-        return {
+        return responseSanitizer({
           statusCode: 200,
           body: JSON.stringify(signedUrls),
-        };
+        });
       } catch (error) {
         console.error("Error uploading images:", error);
-        return {
+        return responseSanitizer({
           statusCode: 500,
           body: JSON.stringify({ error: error.message }),
-        };
+        });
       }
 
     case "listing":
@@ -116,24 +116,24 @@ export const handler = async function (event) {
         });
 
         await Promise.all(fetchPromises);
-        return {
+        return responseSanitizer({
           statusCode: 200,
           body: JSON.stringify(imageListing),
-        };
+        });
       } catch (error) {
         console.error("Error fetching images:", error);
-        return {
+        return responseSanitizer({
           statusCode: 500,
           body: JSON.stringify({ error: error.message }),
-        };
+        });
       }
 
     default:
-      return {
+      return responseSanitizer({
         statusCode: 404,
         body: JSON.stringify({
           message: `Requested service endpoint not found.`,
         }),
-      };
+      });
   }
 };

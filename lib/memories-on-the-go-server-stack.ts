@@ -84,6 +84,11 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
       handler: users,
       proxy: false,
+      defaultCorsPreflightOptions: {
+        allowOrigins: ["http://localhost:4200"],
+        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+      },
     });
 
     const imagesApi = new apigateway.LambdaRestApi(this, "imagesAPI", {
@@ -92,6 +97,11 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       },
       handler: images,
       proxy: false,
+      defaultCorsPreflightOptions: {
+        allowOrigins: ["http://localhost:4200"],
+        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+      },
     });
 
     const usersApiResources = usersApi.root.addResource("users");
