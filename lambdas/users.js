@@ -90,23 +90,35 @@ export const handler = async function (event) {
         });
 
         const { Items } = await dbClient.send(command);
-        const user = unmarshall(Items[0]);
-        const isPasswordCorrect = comparePassword(
-          parseRequest.password,
-          user.password
-        );
-        if (isPasswordCorrect) {
-          reponse.display_name = user.name;
-          reponse.access_token = authorizeUser(user.name, user.user_id);
-          return responseSanitizer({
-            statusCode: 200,
-            body: JSON.stringify(reponse),
-          });
+
+        if (Items.length > 0) {
+          const user = unmarshall(Items[0]);
+          const isPasswordCorrect = comparePassword(
+            parseRequest.password,
+            user.password
+          );
+          if (isPasswordCorrect) {
+            reponse.display_name = user.name;
+            reponse.access_token = authorizeUser(user.name, user.user_id);
+            return responseSanitizer({
+              statusCode: 200,
+              body: JSON.stringify(reponse),
+            });
+          } else {
+            return responseSanitizer({
+              statusCode: 400,
+              body: JSON.stringify({
+                field: `password`,
+                message: `Password verification failed.`,
+              }),
+            });
+          }
         } else {
           return responseSanitizer({
             statusCode: 400,
             body: JSON.stringify({
-              message: `Password verification failed.`,
+              field: `username`,
+              message: `Username verification failed.`,
             }),
           });
         }
