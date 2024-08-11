@@ -9,7 +9,7 @@ export const generateSalt = () => bcrypt.genSaltSync(9);
 export const responseSanitizer = (response) => {
   return {
     headers: {
-      "Access-Control-Allow-Origin": "http://localhost:4200",
+      "Access-Control-Allow-Origin": "*",
     },
     ...response,
   };

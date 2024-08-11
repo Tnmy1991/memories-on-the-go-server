@@ -12,6 +12,14 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
     // Create S3 bucket
     const imageBucket = new s3.Bucket(this, "ImageBucket", {
       bucketName: "memories-on-the-go-image-bucket",
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT],
+          allowedOrigins: ["*"],
+          allowedHeaders: ["*"],
+          maxAge: 300,
+        },
+      ],
     });
 
     // User Table
@@ -85,8 +93,8 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       handler: users,
       proxy: false,
       defaultCorsPreflightOptions: {
-        allowOrigins: ["http://localhost:4200"],
-        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
+        allowOrigins: ["*"],
+        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "DELETE"],
         allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
       },
     });
@@ -98,8 +106,8 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       handler: images,
       proxy: false,
       defaultCorsPreflightOptions: {
-        allowOrigins: ["http://localhost:4200"],
-        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
+        allowOrigins: ["*"],
+        allowMethods: ["OPTIONS", "GET", "POST", "PUT", "DELETE"],
         allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
       },
     });
