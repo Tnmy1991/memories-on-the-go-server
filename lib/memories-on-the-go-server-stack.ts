@@ -63,6 +63,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       code: lambda.Code.fromAsset("lambdas"),
       handler: "images.handler",
+      timeout: cdk.Duration.seconds(15),
       environment: {
         PUT_SIGNED_URL_EXPIRY: "1200",
         GET_SIGNED_URL_EXPIRY: "18000",
@@ -76,6 +77,9 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       code: lambda.Code.fromAsset("lambdas"),
       handler: "thumbnail.handler",
       timeout: cdk.Duration.seconds(15),
+      environment: {
+        IMAGE_TABLE_NAME: imageTable.tableName,
+      },
     });
 
     // Create an S3 event source and add it to the Lambda function
@@ -120,6 +124,7 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
     const imagesApiResources = imagesApi.root.addResource("images");
     imagesApiResources.addResource("listing").addMethod("GET");
     imagesApiResources.addResource("upload").addMethod("POST");
+    imagesApiResources.addResource("s3-presigned").addMethod("POST");
 
     // Grant permissions to Lambda function
     imageBucket.grantReadWrite(images);
@@ -127,5 +132,6 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
 
     userTable.grantReadWriteData(users);
     imageTable.grantReadWriteData(images);
+    imageTable.grantReadWriteData(thumbnail);
   }
 }

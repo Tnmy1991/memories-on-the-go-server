@@ -14,51 +14,48 @@ export const handler = async function (event) {
   switch (routePath) {
     case "upload":
       try {
-        let signedUrls = [];
+        const key = uuidv4();
         const payload = JSON.parse(event.body);
-        const uploadPromises = payload.images.map(async (image) => {
-          const s3Key = `${uuidv4()}-${image}`;
-          const command = new PutObjectCommand({
+        const s3Key = `${key}-${payload.image}`;
+
+        await dbClient.send(
+          new PutItemCommand({
+            TableName: process.env.IMAGE_TABLE_NAME,
+            Item: marshall({
+              image_id: key,
+              user_id: userIdentity.user_id,
+              filename: payload.image,
+              s3_key: s3Key,
+              metadata: "",
+              s3_key_thumbnail: `thumbnails/${s3Key}`,
+              created_at: new Date().toISOString(),
+            }),
+          })
+        );
+        const url = await getSignedUrl(
+          s3Client,
+          new PutObjectCommand({
             Key: s3Key,
             Bucket: process.env.IMAGE_BUCKET_NAME,
-          });
-
-          try {
-            const imageParam = {
-              TableName: process.env.IMAGE_TABLE_NAME,
-              Item: marshall({
-                image_id: uuidv4(),
-                user_id: userIdentity.user_id,
-                filename: image,
-                s3_key: s3Key,
-                s3_key_thumbnail: `thumbnails/${s3Key}`,
-                created_at: new Date().toISOString(),
-              }),
-            };
-            await dbClient.send(new PutItemCommand(imageParam));
-            const url = await getSignedUrl(s3Client, command, {
-              expiresIn: process.env.PUT_SIGNED_URL_EXPIRY,
-            });
-
-            signedUrls.push({
-              filename: image,
-              upload_url: url,
-            });
-          } catch (error) {
-            console.error(
-              `Error creating signedUrl for image ${image}:`,
-              error
-            );
+          }),
+          {
+            expiresIn: process.env.PUT_SIGNED_URL_EXPIRY,
           }
-        });
+        );
 
-        await Promise.all(uploadPromises);
         return responseSanitizer({
           statusCode: 200,
-          body: JSON.stringify(signedUrls),
+          body: JSON.stringify({
+            isSuccess: true,
+            filename: payload.image,
+            upload_url: url,
+          }),
         });
       } catch (error) {
-        console.error("Error uploading images:", error);
+        console.error(
+          `Error creating signedUrl for image ${payload.image}:`,
+          error
+        );
         return responseSanitizer({
           statusCode: 500,
           body: JSON.stringify({ error: error.message }),
@@ -67,61 +64,77 @@ export const handler = async function (event) {
 
     case "listing":
       try {
-        const command = new ScanCommand({
-          TableName: process.env.IMAGE_TABLE_NAME,
-          FilterExpression: "#UserId = :user_id",
-          ExpressionAttributeNames: {
-            "#UserId": "user_id",
-          },
-          ExpressionAttributeValues: {
-            ":user_id": { S: userIdentity.user_id },
-          },
-        });
+        let images = [];
+        const { Items } = await dbClient.send(
+          new ScanCommand({
+            TableName: process.env.IMAGE_TABLE_NAME,
+            FilterExpression: "#UserId = :user_id",
+            ExpressionAttributeNames: {
+              "#UserId": "user_id",
+            },
+            ExpressionAttributeValues: {
+              ":user_id": { S: userIdentity.user_id },
+            },
+          })
+        );
 
-        let imageListing = [];
-        const { Items } = await dbClient.send(command);
-        const fetchPromises = Items.map(async (item) => {
-          const image = unmarshall(item);
-          try {
-            const original_image = await getSignedUrl(
-              s3Client,
-              new GetObjectCommand({
-                Bucket: process.env.IMAGE_BUCKET_NAME,
-                Key: image.s3_key,
-              }),
-              {
-                expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
-              }
-            );
+        if (Items.length) {
+          images = Items.map((item) => ({ ...unmarshall(item) }));
+        }
 
-            const thumbnail_image = await getSignedUrl(
-              s3Client,
-              new GetObjectCommand({
-                Bucket: process.env.IMAGE_BUCKET_NAME,
-                Key: image.s3_key_thumbnail,
-              }),
-              {
-                expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
-              }
-            );
-
-            imageListing.push({
-              ...image,
-              original_image,
-              thumbnail_image,
-            });
-          } catch (error) {
-            console.error(`Error uploading image ${image.filename}:`, error);
-          }
-        });
-
-        await Promise.all(fetchPromises);
         return responseSanitizer({
           statusCode: 200,
-          body: JSON.stringify(imageListing),
+          body: JSON.stringify({ images }),
         });
       } catch (error) {
         console.error("Error fetching images:", error);
+        return responseSanitizer({
+          statusCode: 500,
+          body: JSON.stringify({ error: error.message }),
+        });
+      }
+
+    case "s3-presigned":
+      if (!event.body) {
+        return responseSanitizer({
+          statusCode: 400,
+          body: "invalid request, you are missing the parameter body",
+        });
+      }
+
+      try {
+        const parseRequest = JSON.parse(event.body);
+        const original_image = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: process.env.IMAGE_BUCKET_NAME,
+            Key: parseRequest.s3_key,
+          }),
+          {
+            expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
+          }
+        );
+
+        const thumbnail_image = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: process.env.IMAGE_BUCKET_NAME,
+            Key: parseRequest.s3_key_thumbnail,
+          }),
+          {
+            expiresIn: process.env.GET_SIGNED_URL_EXPIRY,
+          }
+        );
+
+        return responseSanitizer({
+          statusCode: 200,
+          body: JSON.stringify({
+            original_image,
+            thumbnail_image,
+          }),
+        });
+      } catch (error) {
+        console.error("Error preparing s3 presigned url.", error);
         return responseSanitizer({
           statusCode: 500,
           body: JSON.stringify({ error: error.message }),
