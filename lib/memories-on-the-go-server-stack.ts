@@ -14,7 +14,11 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
       bucketName: "memories-on-the-go-image-bucket",
       cors: [
         {
-          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT],
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.PUT,
+            s3.HttpMethods.POST,
+          ],
           allowedOrigins: ["*"],
           allowedHeaders: ["*"],
           maxAge: 300,
@@ -39,10 +43,6 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
     const imageTable = new dynamodb.Table(this, "images", {
       partitionKey: {
         name: "image_id",
-        type: dynamodb.AttributeType.STRING,
-      },
-      sortKey: {
-        name: "created_at",
         type: dynamodb.AttributeType.STRING,
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
