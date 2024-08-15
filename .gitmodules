@@ -1,0 +1,3 @@
+[submodule "ui-client"]
+	path = ui-client
+	url = https://github.com/Tnmy1991/memories-on-the-go-client

@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
@@ -157,6 +158,16 @@ export class MemoriesOnTheGoServerStack extends cdk.Stack {
     userTable.grantReadWriteData(users);
     imageTable.grantReadWriteData(images);
     imageTable.grantReadWriteData(thumbnail);
+
+    // Store API endpoint in SSM Parameter Store
+    new ssm.StringParameter(this, "UsersApiEndpoint", {
+      stringValue: usersApi.url,
+      parameterName: "/memories-on-the-go-server/users-api-endpoint",
+    });
+    new ssm.StringParameter(this, "ImagesApiEndpoint", {
+      stringValue: imagesApi.url,
+      parameterName: "/memories-on-the-go-server/images-api-endpoint",
+    });
 
     // Output the website URL
     new cdk.CfnOutput(this, "ClientURL", {
